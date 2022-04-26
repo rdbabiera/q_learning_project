@@ -7,6 +7,9 @@ import os
 # Path of directory on where this file is located
 path_prefix = os.path.dirname(__file__) + "/action_states/"
 
+# Path of directory to locate where to store q_matrices
+qmatrix_path = os.path.dirname(__file__) + "/q_matrix/"
+
 class QLearning(object):
     def __init__(self):
         # Initialize this node
@@ -44,9 +47,14 @@ class QLearning(object):
         self.states = np.loadtxt(path_prefix + "states.txt")
         self.states = list(map(lambda x: list(map(lambda y: int(y), x)), self.states))
 
+        # Initialize Q-Matrix
+        self.q_matrix = None
+
     def save_q_matrix(self):
         # TODO: You'll want to save your q_matrix to a file once it is done to
         # avoid retraining
+        a = numpy.asarray([ [1,2,3], [4,5,6], [7,8,9] ])
+        numpy.savetxt(qmatrix_path + "q_matrix.csv", self.q_matrix, delimiter=",")
         return
 
 if __name__ == "__main__":
