@@ -69,7 +69,8 @@ class QLearning(object):
         self.curr_state = 0
         self.curr_action = 0
 
-        self.last_update = 0
+        self.flag = False
+        self.curr_reward = 0
 
         self.epsilon = 0.001
         self.alpha = 1.0
@@ -94,9 +95,41 @@ class QLearning(object):
     def run_q_learning(self):
         expected_iteration = 0
         while not self.q_convergence:
-            if self.iterations == expected_iteration:
-                expected_iteration += 1
-                self.select_random_action()
+            self.flag = False
+            self.select_random_action()
+
+            # Wait for Reward
+            while not self.flag:
+                continue
+
+            # Update Q Matrix
+            reward = self.reward
+            # Update Q Matrix after Retrieving Reward
+            next_state = self.get_new_state(int(self.curr_state), self.curr_action)
+            max_reward_next_state = 0
+            for action_reward in self.q_matrix[next_state]:
+                if action_reward > max_reward_next_state:
+                    max_reward_next_state = action_reward
+
+            print(f"{reward} + {self.gamma * max_reward_next_state} - {self.q_matrix[self.curr_state, self.curr_action]}")
+            update = self.alpha * (reward + (self.gamma * max_reward_next_state) - self.q_matrix[self.curr_state, self.curr_action])
+            self.q_matrix[self.curr_state, self.curr_action] += update
+
+            print(f"Update: {update}, Reward: {reward} at state {self.curr_state}")
+
+            if self.check_reset(next_state):
+                self.curr_state = 0
+                if (float(update) < self.epsilon) and (reward > 0):
+                    print(f"Update: {float(update)}")
+                    print(f"Converged at state {next_state}!")
+                    self.q_convergence = True
+            else:
+                self.curr_state = next_state
+            
+            q_matrix = QMatrix()
+            q_matrix.q_matrix = self.q_matrix
+            self.q_update_pub.publish(q_matrix)
+
         self.save_q_matrix()
         exit(0)
 
@@ -113,38 +146,10 @@ class QLearning(object):
     # Callback Method: update_q_matrix(data) updates the q_matrix on each robot 
     # action followed by a reward
     def update_q_matrix(self, data):
-        if self.debug:
-            print(f"in callback, data iteration is {data.iteration_num}")
+        # print("Callback")
+        self.reward = data.reward
+        self.flag = True
 
-        # Update Q Matrix after Retrieving Reward
-        next_state = self.get_new_state(int(self.curr_state), self.curr_action)
-        max_reward_next_state = 0
-        for action_reward in self.q_matrix[next_state]:
-            if action_reward > max_reward_next_state:
-                max_reward_next_state = action_reward
-
-        update = (self.alpha * (data.reward + (self.gamma * max_reward_next_state) - \
-            self.q_matrix[self.curr_state, self.curr_action]))
-        self.q_matrix[self.curr_state, self.curr_action] += update
-
-
-        if self.check_reset(next_state):
-            self.curr_state = 0
-            if update < self.epsilon:
-                self.q_convergence = True
-        else:
-            self.curr_state = next_state
-
-        if self.debug:
-            print(f"Set Iteration to {self.iterations}")
-            print(f"Prize: {data.reward}")
-
-        q_matrix = QMatrix()
-        q_matrix.q_matrix = self.q_matrix
-        self.q_update_pub.publish(q_matrix)
-
-        # Release Lock
-        self.iterations += 1
 
     # Helper Method: get_new_state(state, action) retrieves the next state 
     # given the current state and the action taken.
@@ -159,7 +164,8 @@ class QLearning(object):
     def select_random_action(self):
         # Randomly Generate Action
         action = np.random.randint(0, 9)
-        while self.q_matrix[self.curr_state, action] == -1:
+        curr_state = self.curr_state
+        while self.q_matrix[curr_state, action] == -1:
             action = np.random.randint(0, 9)
         self.curr_action = action
 
@@ -167,10 +173,6 @@ class QLearning(object):
         command = RobotMoveObjectToTag()
         command.robot_object = self.actions[self.curr_action]['object']
         command.tag_id = self.actions[self.curr_action]['tag']
-
-        if self.debug:
-            print(f"From state {self.curr_state}, perform {self.curr_action}")
-            print(f"Command: object: {command.robot_object}, tag: {command.tag_id}")
 
         # Publish To Topic
         self.q_action_pub.publish(command)
