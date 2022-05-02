@@ -65,16 +65,17 @@ class QLearning(object):
         self.q_matrix.fill(-1)
 
         self.q_convergence = False
-        self.iterations = 0
         self.curr_state = 0
         self.curr_action = 0
 
         self.flag = False
         self.curr_reward = 0
 
-        self.epsilon = 0.001
+        self.epsilon = 0.0001
         self.alpha = 1.0
         self.gamma = 0.8
+
+        self.previous_updates = []
 
         # Run Q Learning Algorithm
         self.init_q_matrix()
@@ -115,11 +116,15 @@ class QLearning(object):
             update = self.alpha * (reward + (self.gamma * max_reward_next_state) - self.q_matrix[self.curr_state, self.curr_action])
             self.q_matrix[self.curr_state, self.curr_action] += update
 
+            if len(self.previous_updates) == 1000:
+                self.previous_updates.pop(0)
+            self.previous_updates.append(update)
+
             print(f"Update: {update}, Reward: {reward} at state {self.curr_state}")
 
             if self.check_reset(next_state):
                 self.curr_state = 0
-                if (float(update) < self.epsilon) and (reward > 0):
+                if (len(self.previous_updates) == 1000) and (sum(self.previous_updates) / 1000) < self.epsilon:
                     print(f"Update: {float(update)}")
                     print(f"Converged at state {next_state}!")
                     self.q_convergence = True
