@@ -94,7 +94,7 @@ class QLearning(object):
     # Primary Method: run_q_learning() fills out the self.q_matrix object until 
     # convergence
     def run_q_learning(self):
-        expected_iteration = 0
+        print("Running Q Learning Algorithm")
         while not self.q_convergence:
             self.flag = False
             self.select_random_action()
@@ -143,6 +143,7 @@ class QLearning(object):
             self.q_update_pub.publish(q_matrix)
 
         self.save_q_matrix()
+        print("Finished Saving Q Matrix")
         exit(0)
 
 

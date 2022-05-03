@@ -38,18 +38,10 @@
   <!-- Run a transformation between the robot and its laser -->
   <node pkg="tf" type="static_transform_publisher" name="link3_broadcaster" args="0.0 0.0 0.1016 0 0 0 /base_footprint /camera_rgb_optical_frame 100" />
 
-  <!-- run world restting node -->
-  <node name="reset_world_q_learning" pkg="q_learning_project" type="reset_world.py" respawn="true" />
-
   <!-- run virtual_reset_world.py -->
-  <node pkg="q_learning_project" type="virtual_reset_world" name="virtual_reset_world"/>
+  <node pkg="q_learning_project" type="virtual_reset_world.py" name="virtual_reset_world"/>
   
   <!-- q_learning.py -->
-  <node pkg="q_learning_project" type="q_learning" name="q_learning"/>
-  
-
-
-
-
+  <node pkg="q_learning_project" type="q_learning.py" name="q_learning"/>
 
 </launch>
