@@ -4,7 +4,7 @@ import rospy
 import numpy as np
 import os
 
-from q_learning_project.msg import QLearningReward, QMatrix, RobotMoveObjectToTag
+from q_learning_project.msg import QLearningReward, QMatrix, RobotMoveObjectToTag, QMatrixRow
 
 # Path of directory on where this file is located
 path_prefix = os.path.dirname(__file__) + "/action_states/"
@@ -61,7 +61,7 @@ class QLearning(object):
         self.debug = True
 
         # Initialize Q-Matrix, Constants
-        self.q_matrix = np.zeros((64, 9), dtype='f')
+        self.q_matrix = np.zeros((64, 9), dtype=np.int16)
         self.q_matrix.fill(-1)
 
         self.q_convergence = False
@@ -112,7 +112,6 @@ class QLearning(object):
                 if action_reward > max_reward_next_state:
                     max_reward_next_state = action_reward
 
-            print(f"{reward} + {self.gamma * max_reward_next_state} - {self.q_matrix[self.curr_state, self.curr_action]}")
             update = self.alpha * (reward + (self.gamma * max_reward_next_state) - self.q_matrix[self.curr_state, self.curr_action])
             self.q_matrix[self.curr_state, self.curr_action] += update
 
@@ -120,19 +119,27 @@ class QLearning(object):
                 self.previous_updates.pop(0)
             self.previous_updates.append(update)
 
-            print(f"Update: {update}, Reward: {reward} at state {self.curr_state}")
 
             if self.check_reset(next_state):
                 self.curr_state = 0
                 if (len(self.previous_updates) == 1000) and (sum(self.previous_updates) / 1000) < self.epsilon:
-                    print(f"Update: {float(update)}")
-                    print(f"Converged at state {next_state}!")
                     self.q_convergence = True
+
+                    # Convert -1 back to 0
+                    for i, r in enumerate(self.q_matrix):
+                        for j in range(0, len(r)):
+                            if self.q_matrix[i, j] == -1:
+                                self.q_matrix[i, j] = 0
             else:
                 self.curr_state = next_state
             
+            # Copy Q Matrix In
             q_matrix = QMatrix()
-            q_matrix.q_matrix = self.q_matrix
+            for r in self.q_matrix:
+                row = QMatrixRow()
+                row.q_matrix_row = r
+                q_matrix.q_matrix.append(row)
+
             self.q_update_pub.publish(q_matrix)
 
         self.save_q_matrix()
@@ -151,7 +158,6 @@ class QLearning(object):
     # Callback Method: update_q_matrix(data) updates the q_matrix on each robot 
     # action followed by a reward
     def update_q_matrix(self, data):
-        # print("Callback")
         self.reward = data.reward
         self.flag = True
 
@@ -167,7 +173,7 @@ class QLearning(object):
     # Helper Method: select_random_action() selects a random possible action 
     # and publishes it to the robot.
     def select_random_action(self):
-        # Randomly Generate Action
+        # Randomly Generate Action, Keep Randomizing until Valid
         action = np.random.randint(0, 9)
         curr_state = self.curr_state
         while self.q_matrix[curr_state, action] == -1:

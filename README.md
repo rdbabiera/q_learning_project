@@ -99,11 +99,27 @@ method.
 
 ## Writeup
 ### Objectives
-#TODO 
+The first goal of this project is to implement Q-Learning in order to teach 
+TurtleBot where to place different colored objects given unique tags. Because 
+the tag locations should be randomized, the next big goal in this project 
+is to both detect which colored object is which as well as its location, and 
+to identify and locate the tags using camera perception. The last goal is to 
+practice using robot manipulation in order to lift objects and carry them to 
+their respective goalposts.
 
 
 ### High Level Description
-#TODO 
+Our system first runs a Q-Learning algorithm in order to find the best path(s) 
+in placing each object in front of its respective tag. After initializing the 
+Q-Matrix, a loop runs until the average update value of the previous 1000 
+timesteps evaluates to a declared epsilon. Within this loop, a valid action 
+for the current state is randomly selected, a command is published to the 
+TurtleBot, and when a reward is received via a Subscriber, the Q Matrix is 
+updated according to the optimization formula and the updated Q Matrix is 
+published to its respective publisher topic. After convergence, the Q Matrix 
+is exported to a csv file.
+
+#TODO - Perception and Control
 
 
 ### Q-Learning Algorithm
@@ -121,11 +137,20 @@ function / portion of code):
 
 
 3. Determining when to stop iterating through the Q-learning algorithm
-
+In order to determine when to stop iterating through the Q-learning algorithm, 
+we take advice from the following article: https://stats.stackexchange.com/questions/322933/q-learning-when-to-stop-training.
+We implement the idea of taking the average performance of the algorithm for 
+the previous 1000 episodes; this can be found in the QLearning class' 
+run_q_learning() method. The algorithm runs for a minimum of 1000 time steps, 
+and afterwards checks to see if the average of the 1000 most recent updates 
+is less than epsilon - if so, the algorithm stops running. The 1000 most recent 
+update values are held in a 1000-entry queue, in which old updates are popped 
+from the start of the array and new ones are appended onto it.
 
 
 4. Executing the path most likely to lead to receiving a reward after the 
 Q-matrix has converged on the simulated Turtlebot3 robot
+
 
 
 ### Robot Perspective
