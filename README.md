@@ -21,7 +21,7 @@ an object to the tag. If the reward given matches what we wrote above, then it w
 
 - Determining when the Q-Matrix has converged
 
-As we keep training the Q-Learning algorithm in the Training phase, the rate at which thequality 
+As we keep training the Q-Learning algorithm in the Training phase, the rate at which the quality 
 changes will reduce over time as the matrix gets closer and closer to its most "optimal" states. 
 However, with so many different combinations of states and possible "trajectories", it may take 
 a really long time to make the Q-Matrix completely optimal. This will require some testing and 
@@ -129,11 +129,12 @@ sections of the code executed each of these components (1-3 sentences per
 function / portion of code): 
 
 1. Selecting and executing actions for the robot (or phantom robot) to take
-
+The algorithm which we use in order to select and execute actions for the robot is present in the "select_random_action" function present in the QLearning class. Here, we choose a random number between 0 and 8, representing each of the possible actions. Then we check if that action is possible within the current state. If we determine that it is not possible (because the q_matrix returns -1), then we will choose another random action, until we find one that is possible. Once the random action is determined, we create a "RobotMoveObjectToTag" object, set the robot's action and tag values according to the random action that we selected, and then publish it. 
 
 
 2. Updating the Q-Matrix
 
+We update the Q-Matrix in two functions: "run_q_learning" and "update_q_matrix". In "update_q_matrix", we simply wait to receive the reward data from the Rospy Subscriber, where we then collect the reward data and set a flag to true in order to tell "run_q_learning" that there is a reward ready to be executed upon. It is in this latter function that the majority of the functionality is implemented. After we have ensured that we have retrieved a reward, we then retrieve the next staten given the current state and the action taken, ensuring that the action remains the same. We then check what the maximum reward in the next state is. We then calculate the Q-Learning equation that we learned in class. Then, we are storing the latest one thousand updates. We then check for convergence by ensuring that our training model has run for atleast 1000 iterations. If the average rate of change for the last 10000 ierations is less than our epsilon value (of 0.0001), then we choose to converge, change the invlaid q_matrices back to 0, and then write the QMatrix. 
 
 
 3. Determining when to stop iterating through the Q-learning algorithm
