@@ -61,10 +61,12 @@ class StateController(object):
                 if act == action:
                     self.curr_state = j
                     break
+        print(f"[SERVER] Sending action {action}")
         return StateServiceResponse(action)
 
     def run(self):
         s = rospy.Service('action_request_service', StateService, self.handle_action_request)
+        print("[SERVER] Ready to Handle Requests")
         rospy.spin()
 
 if __name__=="__main__":
