@@ -185,16 +185,19 @@ class Robot(object):
         # 1. Go To Object
         self.navigate_to_object(color, color_codes)
         # 2. Pickup Object
-        # self.pickup()
+        self.pickup()
         #--- 2.1 Verify Object Picked Up
-        # while not self.verify_object_picked_up(color, color_codes):
-            # self.navigate_to_object(color, color_codes)
-            # self.pickup()
+        #while not self.verify_object_picked_up(color, color_codes):
+        #    self.navigate_to_object(color, color_codes)
+        #    self.pickup()
+        
         # 3. Locate Tag
         # 4. Goto Tag
         self.backup_robot()
         self.navigate_to_tag(tag_id)
         # 5. Drop Object
+
+        self.drop()
         #--- 5.1 Verify Dropoff
         # 6. Back Away from Object
         self.backup_robot()
@@ -360,12 +363,20 @@ class Robot(object):
         self.arm.move_arm(arm_straight_goal)
         self.arm.open_grip()
 
-        self.move_pub.publish(movement)
+        self.move_pub.publish(self.movement)
         rospy.sleep(0.2)
 
         self.arm.close_grip()
 
         self.arm.move_arm(arm_lift_goal)
+
+    def drop(self):
+
+        arm_straight_goal = [0, 0, 0, 0]
+
+        self.arm.move_arm(arm_straight_goal)
+
+        self.arm.open_grip()
 
 
     def verify_object_picked_up(self, color, color_codes):
