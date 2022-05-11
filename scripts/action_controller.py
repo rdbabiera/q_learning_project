@@ -120,7 +120,7 @@ class Robot(object):
         self.color_codes = {}
         self.color_codes["pink"] = {'high': [165, 192, 217], 'low': [152, 102, 63]}
         self.color_codes["green"] = {'high': [45, 204, 217], 'low': [30, 114, 63]}
-        self.color_codes["blue"] = {'high': [105, 192, 217], 'low': [94, 102, 63]}
+        self.color_codes["blue"] = {'high': [105, 192, 217], 'low': [95, 102, 63]}
 
         """
         Sleep for Warmup
@@ -188,7 +188,7 @@ class Robot(object):
         rate = rospy.Rate(3)
 
         command.linear.x = -0.10
-        for i in range(0, 15):
+        for i in range(0, 10):
             self.move_pub.publish(command)
             rate.sleep()
         command.linear.x = 0
@@ -206,7 +206,16 @@ class Robot(object):
         command = Twist()
 
         while self.last_image is None:
+            rate.sleep()
             continue
+        
+        print("[CLIENT] Received Images!")
+
+        while self.last_scan is None:
+            rate.sleep()
+            continue
+
+        print("[CLIENT] Received LiDAR Data!")
 
         # Find Object
         while not found:
@@ -378,7 +387,7 @@ class Robot(object):
 
         self.movement.linear.x = 0.01
         self.movement.angular.z = 0
-        for i in range(0, 40):
+        for i in range(0, 30):
             self.move_pub.publish(self.movement)
             rate.sleep()
 
@@ -394,17 +403,14 @@ class Robot(object):
     def lift(self):
         rate = rospy.Rate(5)
         arm_lift_goal = [0, -12, -22, -56]
-        for i in range(0, 5):
-            self.arm.move_arm(arm_lift_goal)
-            rate.sleep()
+        self.arm.move_arm(arm_lift_goal)
 
     def drop(self):
         rate = rospy.Rate(5)
         arm_straight_goal = [0, 28, 4, -31]
 
-        for i in range(0, 5):
-            self.arm.move_arm(arm_straight_goal)
-            rate.sleep()
+        self.arm.move_arm(arm_straight_goal)
+        rospy.sleep(2)
         self.arm.open_grip()
 
     def run(self):
