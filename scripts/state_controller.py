@@ -29,7 +29,7 @@ class StateController(object):
         """
         Sleep for Warmup
         """
-        rospy.sleep(5)
+        rospy.sleep(3)
 
     def handle_action_request(self, req):
         action = -1

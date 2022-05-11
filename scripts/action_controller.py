@@ -49,18 +49,6 @@ class Arm(object):
               
     def move_arm(self, joints):
         
-        # Tips:
-        # arm_joint_goal is a list of 4 radian values, 1 for each joint
-        # for instance,
-        #           arm_joint_goal = [0.0,0.0,0.0,0.0]
-        #           arm_joint_goal = [0.0,
-        #               math.radians(5.0),
-        #               math.radians(10.0),
-        #               math.radians(-20.0)]
-    
-
-        # wait=True ensures that the movement is synchronous
-        # arm_joint_goal = [0.0, 0.0, 0.0, 0.0]
         arm_joint_goal = [math.radians(joints[0]),
                           math.radians(joints[1]),
                           math.radians(joints[2]),
@@ -71,11 +59,8 @@ class Arm(object):
 
     def open_grip(self):
 
-        # gripper_joint_goal is a list of 2 radian values, 1 for the left gripper and 1 for the right gripper
-        # for instance,
-        #           gripper_joint_goal = [-0.009,0.0009]
-        #           gripper_joint_goal = [0.0, 0.0]
-        gripper_joint_goal = [-0.009,0.0009]
+        # gripper_joint_goal is a list of 2 distance values
+        gripper_joint_goal = [0.012,0.0012]
         self.move_group_gripper.go(gripper_joint_goal, wait=True)
         self.move_group_gripper.stop()
 
@@ -86,7 +71,7 @@ class Arm(object):
         # for instance,
         #           gripper_joint_goal = [-0.009,0.0009]
         #           gripper_joint_goal = [0.0, 0.0]
-        gripper_joint_goal = [0.0, 0.0]
+        gripper_joint_goal = [-0.002, -0.002]
         self.move_group_gripper.go(gripper_joint_goal, wait=True)
         self.move_group_gripper.stop()
 
@@ -121,6 +106,7 @@ class Robot(object):
         """
 
         self.arm = Arm()
+        self.movement = Twist()
 
         """
         Set Up Action Array, Colors to HSV
@@ -132,9 +118,9 @@ class Robot(object):
             self.actions
         ))
         self.color_codes = {}
-        self.color_codes["pink"] = {'high': [165, 255, 217], 'low': [161, 171, 161]}
-        self.color_codes["green"] = {'high': [37, 255, 230], 'low': [30, 192, 137]}
-        self.color_codes["blue"] = {'high': [100, 225, 232], 'low': [94, 94, 122]}
+        self.color_codes["pink"] = {'high': [165, 192, 217], 'low': [152, 102, 63]}
+        self.color_codes["green"] = {'high': [45, 204, 217], 'low': [30, 114, 63]}
+        self.color_codes["blue"] = {'high': [105, 192, 217], 'low': [94, 102, 63]}
 
         """
         Sleep for Warmup
@@ -148,9 +134,6 @@ class Robot(object):
     def image_callback(self, data):
         image = self.bridge.imgmsg_to_cv2(data, desired_encoding='bgr8')
         self.last_image = image
-        cv2.imshow("window", image)
-        cv2.waitKey(3)
-        pass
 
     def get_action(self):
         print("[CLIENT] In get_action()")
@@ -186,19 +169,16 @@ class Robot(object):
         self.navigate_to_object(color, color_codes)
         # 2. Pickup Object
         self.pickup()
-        #--- 2.1 Verify Object Picked Up
-        #while not self.verify_object_picked_up(color, color_codes):
-        #    self.navigate_to_object(color, color_codes)
-        #    self.pickup()
+        self.lift()
         
         # 3. Locate Tag
         # 4. Goto Tag
         self.backup_robot()
         self.navigate_to_tag(tag_id)
         # 5. Drop Object
-
         self.drop()
-        #--- 5.1 Verify Dropoff
+        self.lift()
+
         # 6. Back Away from Object
         self.backup_robot()
     
@@ -208,11 +188,11 @@ class Robot(object):
         rate = rospy.Rate(3)
 
         command.linear.x = -0.10
-        for i in range(0, 10):
+        for i in range(0, 15):
             self.move_pub.publish(command)
             rate.sleep()
         command.linear.x = 0
-        for i in range(0, 10):
+        for i in range(0, 5):
             self.move_pub.publish(command)
             rate.sleep()
         print("[CLIENT] ROBOT STOPPED")
@@ -222,29 +202,35 @@ class Robot(object):
         
         # State Variables
         found = False
+        rate = rospy.Rate(2)
         command = Twist()
+
+        while self.last_image is None:
+            continue
 
         # Find Object
         while not found:
             img = self.last_image
+            h, w, d = img.shape
             hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
-
             mask = cv2.inRange(hsv, np.array(color_codes['low']), np.array(color_codes['high']))
             M = cv2.moments(mask)
             if M['m00'] > 0:
                 found = True
                 command.angular.z = 0
-                for i in range(0, 10):
+                for i in range(0, 5):
                     self.move_pub.publish(command)
+                    rate.sleep()
             else:
-                command.angular.z = 0.60
+                command.angular.z = 0.25
 
             self.move_pub.publish(command)
-        
-        # Navigate to Object
-        at_object = False
-        while not at_object:
-            # Image Da
+            rate.sleep()
+        print(f"[CLIENT] Finished Finding {color} object")
+
+        # Align to Object
+        aligned = False
+        while not aligned:
             img = self.last_image
             h, w, d = img.shape
             hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
@@ -252,40 +238,67 @@ class Robot(object):
             M = cv2.moments(mask)
             if M['m00'] > 0:
                 cx = int(M['m10']/M['m00'])
-                cy = int(M['m01']/M['m00'])
+                if (cx >= ((w/2) - (w * .05))) and (cx <= ((w/2) + (w * .05))):
+                    aligned = True
+                    command.angular.z = 0
+                else:
+                    command.angular.z = (-cx + (w/2)) * 0.001
 
-                command = Twist()
-                # Determine Linear Speed:
-                scan = self.last_scan
-                ranges = scan.ranges
-                average_distance = 0
+            self.move_pub.publish(command)
+            rate.sleep()
+        print(f"[CLIENT] Aligned with {color} object!")
+
+        
+        # Navigate to Object
+        at_object = False
+        while not at_object:
+            command = Twist()
+            # Determine Linear Speed:
+            scan = self.last_scan
+            ranges = scan.ranges
+            lowest_index = 0
+            lowest_distance = 4.5
+            for r in range(355, 366):
                 count = 0
-                for r in range(357, 364):
-                    ind = r % 360
-                    if ranges[ind] != np.inf and ranges[ind] > 0:
-                        average_distance += ranges[ind]
+                avg_distance = 0
+                ind = r % 360
+                for r2 in range(r-3, r+4):
+                    ind2 = r2 % 360
+                    if ranges[ind2] != np.inf and ranges[ind2] > 0:
+                        avg_distance += ranges[ind2]
                         count += 1
                 if count > 0:
-                    average_distance /= count
-                if (average_distance > 0) and (average_distance < 0.35):
-                    command.linear.x = 0
-                    at_object = True
+                    avg_distance /= count
+                    if avg_distance < lowest_distance:
+                        lowest_distance = avg_distance
+                        lowest_index = ind
+
+            if lowest_distance > 0 and lowest_distance < 0.30:
+                command.linear.x = 0
+                command.angular.z = 0
+                at_object = True
+            else:
+                command.linear.x = 0.075
+                if lowest_index > 180:
+                    command.angular.z = (lowest_index - 360) * 0.01
                 else:
-                    command.linear.x = 0.10
-                
-                command.angular.z = (-cx + (w/2)) * 0.001
-                self.move_pub.publish(command)
+                    command.angular.z = (lowest_index - 0) * 0.01
+            
+            self.move_pub.publish(command)
+            rate.sleep()
 
         command.linear.x = 0
         command.angular.z = 0
-        for i in range(0, 10):
+        for i in range(0, 5):
             self.move_pub.publish(command)
+            rate.sleep()
         print(f"[CLIENT] Finished Navigating to {color} object")
 
 
     def navigate_to_tag(self, tag_id):
         print(f"[CLIENT] Navigating to tag {tag_id}")
         found = False
+        rate = rospy.Rate(2)
         command = Twist()
         command.linear.x = 0
 
@@ -304,9 +317,10 @@ class Robot(object):
                         for i in range(0, 10):
                             self.move_pub.publish(command)
             if not found:
-                command.angular.z = 0.60
+                command.angular.z = 0.25
 
             self.move_pub.publish(command)
+            rate.sleep()
         
         # Found Tag, Navigate to It
         at_object = False
@@ -329,69 +343,69 @@ class Robot(object):
             ranges = scan.ranges
             average_distance = 0
             count = 0
-            for r in range(357, 364):
+            for r in range(358, 363):
                 ind = r % 360
                 if ranges[ind] != np.inf and ranges[ind] > 0:
                     average_distance += ranges[ind]
                     count += 1
             if count > 0:
                 average_distance /= count
-            if (average_distance > 0) and (average_distance < 0.55):
+            if (average_distance > 0) and (average_distance < 0.50):
                 command.linear.x = 0
                 at_object = True
             else:
-                command.linear.x = 0.20
+                command.linear.x = 0.10
             self.move_pub.publish(command)
+            rate.sleep()
         
         command.linear.x = 0
         command.angular.z = 0
         for i in range(0, 10):
             self.move_pub.publish(command)
+            rate.sleep()
         print(f"[CLIENT] Finished Navigating to tag {tag_id}")
         
 
 
     def pickup(self):
-
-        arm_straight_goal = [0, 0, 0, 0]
-
-        arm_lift_goal = [81, 45, 39, 58]
+        rate = rospy.Rate(5)
+        arm_straight_goal = [0, 28, 4, -31]
         
+        self.arm.open_grip()
+        for i in range(0, 5):
+            self.arm.move_arm(arm_straight_goal)
+            rate.sleep()
+
         self.movement.linear.x = 0.01
         self.movement.angular.z = 0
+        for i in range(0, 40):
+            self.move_pub.publish(self.movement)
+            rate.sleep()
 
-        self.arm.move_arm(arm_straight_goal)
-        self.arm.open_grip()
-
-        self.move_pub.publish(self.movement)
-        rospy.sleep(0.2)
+        self.movement.linear.x = 0.00
+        self.movement.angular.z = 0
+        for i in range(0, 15):
+            self.move_pub.publish(self.movement)
+            rate.sleep()
 
         self.arm.close_grip()
 
-        self.arm.move_arm(arm_lift_goal)
+
+    def lift(self):
+        rate = rospy.Rate(5)
+        arm_lift_goal = [0, -12, -22, -56]
+        for i in range(0, 5):
+            self.arm.move_arm(arm_lift_goal)
+            rate.sleep()
 
     def drop(self):
+        rate = rospy.Rate(5)
+        arm_straight_goal = [0, 28, 4, -31]
 
-        arm_straight_goal = [0, 0, 0, 0]
-
-        self.arm.move_arm(arm_straight_goal)
-
+        for i in range(0, 5):
+            self.arm.move_arm(arm_straight_goal)
+            rate.sleep()
         self.arm.open_grip()
-
-
-    def verify_object_picked_up(self, color, color_codes):
-        print(f"[CLIENT] Verifying {color} object picked up")
-        img = self.last_image
-        hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
-
-        mask = cv2.inRange(hsv, np.array(color_codes['low']), np.array(color_codes['high']))
-        M = cv2.moments(mask)
-        if M['m00'] > 0:
-            print(f"[CLIENT] Verification Failed... Robot can still see {color} object")
-            return False
-        print(f"[CLIENT] Verification Successful!")
-        return True
-
 
     def run(self):
         self.get_action()
@@ -399,5 +413,6 @@ class Robot(object):
 
 if __name__ == "__main__":
     robot = Robot()
+    rospy.sleep(1)
     robot.run()
 
