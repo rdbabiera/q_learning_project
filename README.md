@@ -119,14 +119,19 @@ updated according to the optimization formula and the updated Q Matrix is
 published to its respective publisher topic. After convergence, the Q Matrix 
 is exported to a csv file.
 
-#TODO - Perception and Control
+Given a Q-Matrix, a state controller maintains the current state of the 
+objects' placements relative to the origin and the tags. An action controller 
+receives actions, and the state control returns an index corresponding to an 
+object and a tag. The action controller navigates the robot towards the object, 
+lifts it up, and drops it in front of the tag. Once an action is completed, actions 
+are requested until the state controller determines that all possible actions 
+for the maximum value path have been achieved.
 
+### Demonstration
+
+insert gifs here :(
 
 ### Q-Learning Algorithm
-#TODO - Describe how you accomplished each of the following components of the 
-Q-learning algorithm in 1-3 sentences, and also describe what functions / 
-sections of the code executed each of these components (1-3 sentences per 
-function / portion of code): 
 
 1. Selecting and executing actions for the robot (or phantom robot) to take
 The algorithm which we use in order to select and execute actions for the robot is present in the "select_random_action" function present in the QLearning class. Here, we choose a random number between 0 and 8, representing each of the possible actions. Then we check if that action is possible within the current state. If we determine that it is not possible (because the q_matrix returns -1), then we will choose another random action, until we find one that is possible. Once the random action is determined, we create a "RobotMoveObjectToTag" object, set the robot's action and tag values according to the random action that we selected, and then publish it. 
@@ -138,6 +143,7 @@ We update the Q-Matrix in two functions: "run_q_learning" and "update_q_matrix".
 
 
 3. Determining when to stop iterating through the Q-learning algorithm
+
 In order to determine when to stop iterating through the Q-learning algorithm, 
 we take advice from the following article: https://stats.stackexchange.com/questions/322933/q-learning-when-to-stop-training.
 We implement the idea of taking the average performance of the algorithm for 
@@ -152,22 +158,38 @@ from the start of the array and new ones are appended onto it.
 4. Executing the path most likely to lead to receiving a reward after the 
 Q-matrix has converged on the simulated Turtlebot3 robot
 
+In order to execute each command most likely to receive a reward after convergence, 
+we split our codebase into two scripts - state_controller.py and action_controller.py. 
+To communicate through these two scripts, the StateController keeps track of the 
+current state of the q_matrix. When the action controller wants an action, the 
+state_controller determines the action that produces the highest reward by looking 
+in the q_matrix for the current state, progressing to the next state through the 
+action matrix, and communicating this state to the ActionController. The 
+service's message parameters are defined in srv/StateService.srv; the state controller 
+provides an action when the ActionController sends a ready status.
 
 
 ### Robot Perspective
-#TODO - Describe how you accomplished each of the following components of the 
-perception elements of this project in 1-3 sentences, any online sources of 
-information/code that helped you to recognize the objects, and also describe what 
-functions / sections of the code executed each of these components (1-3 sentences 
-per function / portion of code): 
 
 1. Identifying the locations and identities of each of the colored objects
 
-
+In order to identify the locations and identities of each of the colored objects, 
+the action controller first maps the action received from the state controller 
+to a color, and HSV high and low values are assigned to each color. The Robot 
+object's navigate_to_object() method uses a mask to filter all values outside 
+the HSV range, and if a mask exists the robot stops; otherwise, the robot spins 
+indiscriminantly. Next, the robot aligns itself with the center of the filtered 
+color using the camera feed again, and stops when this is acheived with a 10% 
+image width tolerance; proportional control is used to determine angular speed. 
 
 2. Identifying the locations and identities of each of the AR tags
 
-
+Identifying the AR tags is performed in the Robot object's navigate_to_tag() 
+method. Similar to identifying the locations and identities of the objects, 
+this method begins by spinning indiscriminantly until the tag id provided by 
+the object is in view. This is done using the cv2 aruco library, and if 
+any tags are found each tag is checked to make sure it is the tag we are looking 
+for.
 
 ### Robot Manipulation and Movement
 #TODO - Describe how you accomplished each of the following components of the 
@@ -177,22 +199,78 @@ components (1-3 sentences per function / portion of code):
 
 1. Moving to the right spot in order to pick up a colored object
 
-
+Continuing the locations and identities of the colored objects above, when the 
+robot centers the object in its camera view, the robot then follows the closest 
+object in front of it in a 10 degree cone through LiDAR laser scans. This is also 
+performed in the Robot object's navigate_to_object() method, and implements an 
+average of a 7 degree spread for each degree within the cone to account for noise. 
+Slight proportional control is also provided in case the robot drifts away from the 
+object by recentering the robot to have the 0 degree reading be the closest. Once 
+at a designated stopping distance, the robot stops.
 
 2. Picking up the colored object
 
+Include the move into the object
 
 
 3. Moving to the desired destination (AR tag) with the colored object
 
-
+In order to move to the desired destination with the colored object, the 
+Robot object's navigate_to_tag() method provides the behavior necessary to 
+move the robot towards the goal. Using the camera feed, the robot uses proportional 
+control to steer the center of the AR box into directly in front of the camera, and 
+using LiDAR scans, the robot stops once at a set distance from the tag. The distance 
+from the tag/wall is determined using the average distance of a 5 degree cone in 
+front of the robot to account for noise.
 
 4. Putting the colored object back down at the desired destination
 
 
 
+
 ### Challenges
+
+The biggest challenges within this project related to transferring our work 
+from the simulator into the real world. While in Gazebo, we could see the camera 
+feed in real time, be guaranteed that the robot would always stop in front of 
+objects at the correct distance with no overshoot in addition to lining up correctly, 
+and lastly see objects as soon as they enter the camera, these were not present 
+when testing with physical Turtlebots. Because other students could be testing 
+at the same time, the robot could perceive the center of a colored object to 
+the average location of two colored objects if another group's happened to be 
+in view. As a matter of fact, RD's shoes were even mistaken for AR tags due to 
+black and white patterns. This was a quick fix performed by using different 
+classroom objects as barricades such that no other objects would attract our 
+Turtlebot and vice versa. In order to account for network lag, we decided to make 
+our robot slower in general so that it had more time to process new image callbacks 
+and so that it would not overshoot alignment in terms of angle and distance to 
+objects and tags; if this happened, then objects would be missed overall or the 
+arm planner would determine that an object could not be placed at all. Lastly, 
+one of the largest physical Turtlebot challenges related to working with the 
+OpenManipulator. Clock desynchronization has been a problem across multiple 
+projects already, but the OpenManipulator was very sensitive to state changes. 
+This was solved by syncing the clocks on the Pi and the computer running the 
+code before trials.
+
 
 ### Future Work
 
+
+
+
 ### Takeaways
+
+1. Be aware of the tradeoffs of each sensor on the Turtlebot. The camera is a 
+great way to align objects because segmentation guarantees that you'll be looking 
+for the right object, but it very much comes at the cost of runtime. Switching to 
+LiDAR whenever possible makes the robot more responsive, and a combination of the 
+two can be used in a way that the camera sets an object in frame such that the 
+LiDAR becomes less suspectible to noise and other nearby objects.
+
+2. Lag is always going to be present, so thinking around how to make control 
+as robust as possible is a must. This can mean slowing down the robot to make 
+sure that significant overshooting occurs less frequently and ensuring that the 
+robot is still able to achieve baseline behavior in these instances. For example, 
+even when the robot goes to pick up an object and accidentally pushes into it 
+with the claw, the robot moves so slowly such that the object becomes just shy of 
+tipping over and can still be picked up and put down without any real issues.
