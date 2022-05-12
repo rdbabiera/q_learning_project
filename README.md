@@ -129,7 +129,7 @@ for the maximum value path have been achieved.
 
 ### Demonstration
 
-insert gifs here :(
+[![Demo Video](https://img.youtube.com/vi/_2BB4v-6K34/0.jpg)](https://www.youtube.com/watch?v=_2BB4v-6K34)
 
 ### Q-Learning Algorithm
 
@@ -205,13 +205,30 @@ object in front of it in a 10 degree cone through LiDAR laser scans. This is als
 performed in the Robot object's navigate_to_object() method, and implements an 
 average of a 7 degree spread for each degree within the cone to account for noise. 
 Slight proportional control is also provided in case the robot drifts away from the 
-object by recentering the robot to have the 0 degree reading be the closest. Once 
+object by recentering the robot to have the 0 degree reading be the closest. Once
 at a designated stopping distance, the robot stops.
 
 2. Picking up the colored object
 
-Include the move into the object
-
+In order to make coding of the project slightly easier, we decided to divide the code
+in action_controller.py into two objects: Robot and Arm. The arm object was created in 
+order for us to be cognizant of possible conccurency issues between the robot's wheels
+moving and the arm moving at the same time, essentially giving us a reminder queue to always
+use sleep and rate commands to try and make each motion deliberate. Within the Arm class, we 
+initialized the necessary nodes and move_it commanders within the initialization function, 
+and then created three helper functions. "move_arm" would take in as parameters a list of 
+joints that the robot arm should move to in degrees, convert those values to radians, and 
+then move the arm to that desired position. "open_grip" would extend the gripper such that it
+could pick up an object, and then "close_grip" would make the gripper narrower again such that 
+it could pinch an object and lift it up. These helper functions made the rest of the arm control
+extremely easy to implement, test, and tweak. 
+The code that actually picks up the object is contained within the Robot class within the "pickup"
+function. Here, we first make sure to open the gripper. Then, we move the arm first to a "straight" 
+position where it can easily reach out and grab the dumbbell, while sleeping for a few seconds in order 
+to ensure the arm is in the right position. We then move the robot forwards extremely slowly so that the
+gripper is completely around the dumbbell. Afterwards, we close the gripper so the arm is now grabbing our
+object, and we the raise the arm to a heightened position in the "lift" function to make sure the object is
+not obscuring the camera!
 
 3. Moving to the desired destination (AR tag) with the colored object
 
@@ -224,7 +241,12 @@ from the tag/wall is determined using the average distance of a 5 degree cone in
 front of the robot to account for noise.
 
 4. Putting the colored object back down at the desired destination
-
+Dropping an object is extremely similar to pickup, and used the same helper functions
+from the Arm class that we discussed in that previous section. Here, we move the robot
+arm from the lifted position to its original "straight" position, and then open the grip.
+Initially, we had some issues where the gripper would open too soon while the arm was
+still lowering, but a longer sleep session of 2 seconds ensured a smoother drop where 
+the dumbbell was more stable and was much more likely to stay standing. 
 
 
 
@@ -250,12 +272,21 @@ one of the largest physical Turtlebot challenges related to working with the
 OpenManipulator. Clock desynchronization has been a problem across multiple 
 projects already, but the OpenManipulator was very sensitive to state changes. 
 This was solved by syncing the clocks on the Pi and the computer running the 
-code before trials.
+code before trials. Otherwise, sometimes when we sent commands to the arm, it simply wouldn't move.
 
 
 ### Future Work
 
-
+In the future, we think that it would be great if we could use the OpenCV library to not only 
+identify the color, but also the shape of the dumbbell such that it is much more accurate.
+Every once in a while, we were faced with the issue that the turtlebot's camera would find some of
+the blue or green colored bricks at a distance and go in that direction instead of the actual object
+we wanted it to pickup, which was sometimes frustrating! We think being able to train and classify the
+dumbbell and make the turtlebot actually recognize the item would be a good way to get rid of this problem.
+We also think that it would be really interesting if we could add some sort of spatial tracking ability in the 
+future, where the robot could localize where it picked up a specific dumbbell, and then move it back to that 
+location after delivering it to the tag. That sort of object permanence on a robot would be a cool feature, we 
+think. 
 
 
 ### Takeaways
