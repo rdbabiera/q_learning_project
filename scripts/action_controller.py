@@ -57,6 +57,8 @@ class Arm(object):
         # Calling ``stop()`` ensures that there is no residual movement
         self.move_group_arm.stop()
 
+
+    # open_grip() causes the arm to open its grip
     def open_grip(self):
 
         # gripper_joint_goal is a list of 2 distance values
@@ -65,12 +67,13 @@ class Arm(object):
         self.move_group_gripper.stop()
 
         
+    # close_grip() causes the arm to close its grip
     def close_grip(self):
 
-        # gripper_joint_goal is a list of 2 radian values, 1 for the left gripper and 1 for the right gripper
-        # for instance,
-        #           gripper_joint_goal = [-0.009,0.0009]
-        #           gripper_joint_goal = [0.0, 0.0]
+        # gripper_joint_goal is a list of 2 radian values, 1 for the left 
+        # gripper and 1 for the right gripper. for instance,
+        #     gripper_joint_goal = [-0.009,0.0009]
+        #     gripper_joint_goal = [0.0, 0.0]
         gripper_joint_goal = [-0.002, -0.002]
         self.move_group_gripper.go(gripper_joint_goal, wait=True)
         self.move_group_gripper.stop()
@@ -127,14 +130,20 @@ class Robot(object):
         """
         
         rospy.sleep(5)
-    
+
+
+    # updates last scan on received data
     def scan_callback(self, data):
         self.last_scan = data
 
+
+    # updates last image on received data
     def image_callback(self, data):
         image = self.bridge.imgmsg_to_cv2(data, desired_encoding='bgr8')
         self.last_image = image
 
+
+    # sends a request to the state controller for the next action
     def get_action(self):
         print("[CLIENT] In get_action()")
         rospy.wait_for_service('action_request_service')
@@ -153,7 +162,9 @@ class Robot(object):
         except rospy.ServiceException as e:
             print("Service Call Failed: %s"%e)
         return
+
     
+    # given an action, perform all basic steps
     def perform_action(self, action):
         print(f"[CLIENT] Performing action {action}")
         ### Preliminary Steps
@@ -182,6 +193,8 @@ class Robot(object):
         # 6. Back Away from Object
         self.backup_robot()
     
+
+    # after picking up or putting down an object, back up to avoid collision
     def backup_robot(self):
         print("[CLIENT] ROBOT BACKING UP")
         command = Twist()
@@ -197,6 +210,8 @@ class Robot(object):
             rate.sleep()
         print("[CLIENT] ROBOT STOPPED")
 
+
+    # given a color, navigate to said object
     def navigate_to_object(self, color, color_codes):
         print(f"[CLIENT] Navigating to {color} object")
         
@@ -304,6 +319,7 @@ class Robot(object):
         print(f"[CLIENT] Finished Navigating to {color} object")
 
 
+    # given a tag, navigate to it
     def navigate_to_tag(self, tag_id):
         print(f"[CLIENT] Navigating to tag {tag_id}")
         found = False
@@ -376,6 +392,7 @@ class Robot(object):
         
 
 
+    # pickup an object
     def pickup(self):
         rate = rospy.Rate(5)
         arm_straight_goal = [0, 28, 4, -31]
@@ -400,11 +417,14 @@ class Robot(object):
         self.arm.close_grip()
 
 
+    # lift an object when in position
     def lift(self):
         rate = rospy.Rate(5)
         arm_lift_goal = [0, -12, -22, -56]
         self.arm.move_arm(arm_lift_goal)
 
+
+    # drop an object when in position
     def drop(self):
         rate = rospy.Rate(5)
         arm_straight_goal = [0, 28, 4, -31]
@@ -413,9 +433,11 @@ class Robot(object):
         rospy.sleep(2)
         self.arm.open_grip()
 
+
     def run(self):
         self.get_action()
         rospy.spin()
+        
 
 if __name__ == "__main__":
     robot = Robot()

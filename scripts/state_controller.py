@@ -31,6 +31,9 @@ class StateController(object):
         """
         rospy.sleep(3)
 
+
+    # handle_action_request() receives a request from the action controller
+    # and sends the next action
     def handle_action_request(self, req):
         action = -1
         prize = 0
@@ -63,6 +66,7 @@ class StateController(object):
                     break
         print(f"[SERVER] Sending action {action}")
         return StateServiceResponse(action)
+
 
     def run(self):
         s = rospy.Service('action_request_service', StateService, self.handle_action_request)
